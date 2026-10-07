@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#183f49">
+<link rel="manifest" href="manifest.json">
+<title>Harbor Stories</title>
+<style>
+:root{--sea:#183f49;--sand:#f4dfb5;--cream:#fff8e8;--coral:#e9795d;--mint:#8dc7b2;--ink:#17343b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:linear-gradient(#79b8c2,#d7efe8 35%,#f3ddb2);color:var(--ink);min-height:100vh}
+header{background:rgba(24,63,73,.94);color:white;padding:12px 14px;position:sticky;top:0;z-index:5;box-shadow:0 2px 12px #0003}
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px}.brand{font-weight:900;font-size:20px}.stats{display:flex;gap:7px;font-weight:800;font-size:14px}.pill{background:#ffffff20;border:1px solid #ffffff35;padding:7px 9px;border-radius:16px}
+.wrap{max-width:600px;margin:auto;padding:12px}.card{background:#fff9ecdd;border:1px solid #fff8;border-radius:18px;padding:12px;box-shadow:0 8px 20px #31545b25;margin-bottom:12px}
+h3{margin:0 0 8px}.orders{display:flex;gap:8px;overflow:auto}.order{min-width:150px;background:white;border-radius:13px;padding:9px;border:1px solid #ead9b6}.order button,.btn{border:0;border-radius:12px;background:var(--coral);color:white;font-weight:800;padding:8px 10px}.order button:disabled{opacity:.35}
+.board{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;touch-action:manipulation}.cell{aspect-ratio:1;background:#e8d4a9;border:2px solid #d3b982;border-radius:12px;display:flex;align-items:center;justify-content:center;position:relative;font-size:29px;box-shadow:inset 0 2px 4px #fff8;user-select:none}.cell.sel{outline:4px solid #e9795d;transform:scale(.96)}.cell .lv{position:absolute;right:3px;bottom:2px;background:#183f49;color:white;font-size:9px;border-radius:8px;padding:1px 4px}.cell.generator{background:#9dd4bf}.empty{opacity:.3}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}.btn{background:var(--sea)}.btn.alt{background:#679a87}.hint{font-size:13px;opacity:.75;line-height:1.35}.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#17343b;color:white;padding:10px 16px;border-radius:20px;font-weight:700;opacity:0;pointer-events:none;transition:.2s;z-index:9}.toast.show{opacity:1;bottom:35px}
+.progress{height:8px;background:#d7c59e;border-radius:8px;overflow:hidden;margin-top:7px}.progress i{display:block;height:100%;background:#e9795d}
+</style></head>
+<body>
+<header><div class="top"><div class="brand">⚓ Harbor Stories</div><div class="stats"><div class="pill">⚡ ∞</div><div class="pill">🪙 <span id="coins">0</span></div><div class="pill">⭐ <span id="level">1</span></div></div></div></header>
+<div class="wrap">
+<div class="card"><h3>Aufträge</h3><div class="orders" id="orders"></div></div>
+<div class="card"><h3>Dein Hafenbrett</h3><div class="board" id="board"></div><p class="hint">Tippe einen Generator an, um ein Item zu erzeugen. Tippe zwei gleiche Items derselben Stufe nacheinander an, um sie zu verschmelzen. Energie ist unbegrenzt.</p></div>
+<div class="card"><div class="toolbar"><button class="btn" onclick="addGenerator()">🎁 Generator</button><button class="btn alt" onclick="shuffle()">🔀 Sortieren</button><button class="btn alt" onclick="resetGame()">↩ Neustart</button></div><div class="progress"><i id="xpbar"></i></div><p class="hint" id="xptext"></p></div>
+</div><div class="toast" id="toast"></div>
+<script>
+const chains={
+ food:[["🍞","Toast"],["🥪","Sandwich"],["🍔","Burger"],["🍱","Lunchbox"],["🍽️","Festmahl"],["👨‍🍳","Chef-Menü"]],
+ drink:[["☕","Kaffee"],["🧋","Eistee"],["🥤","Shake"],["🍹","Mocktail"],["🫖","Teeservice"],["✨","Signature Drink"]],
+ flower:[["🌱","Spross"],["🌷","Tulpe"],["💐","Strauß"],["🌺","Arrangement"],["🪴","Hafengarten"],["🌸","Blütenbogen"]]
+};
+const gens=[["🧺","food","Küchenkorb"],["🧰","drink","Getränkewagen"],["🪴","flower","Gärtnerei"]];
+let state=JSON.parse(localStorage.getItem("harborStories")||"null")||{coins:100,xp:0,level:1,selected:null,board:Array(36).fill(null),orders:[]};
+if(!state.board.some(Boolean)){state.board[0]={gen:"food",icon:"🧺",name:"Küchenkorb"};state.board[1]={gen:"drink",icon:"🧰",name:"Getränkewagen"};state.board[2]={gen:"flower",icon:"🪴",name:"Gärtnerei"};state.board[8]={type:"food",lv:0};state.board[9]={type:"food",lv:0};}
+function save(){localStorage.setItem("harborStories",JSON.stringify(state))}
+function toast(s){let t=document.getElementById("toast");t.textContent=s;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1200)}
+function itemName(x){return chains[x.type][x.lv][1]} function icon(x){return chains[x.type][x.lv][0]}
+function firstEmpty(){return state.board.findIndex(x=>!x)}
+function produce(i){let g=state.board[i],e=firstEmpty();if(e<0)return toast("Brett ist voll");state.board[e]={type:g.gen,lv:0};toast("∞ Energie — produziert!");render()}
+function tap(i){let x=state.board[i];if(!x){state.selected=null;return render()} if(x.gen)return produce(i);
+ if(state.selected===null){state.selected=i;return render()}
+ let j=state.selected,y=state.board[j]; if(j===i){state.selected=null;return render()}
+ if(y&&!y.gen&&y.type===x.type&&y.lv===x.lv&&x.lv<chains[x.type].length-1){state.board[i]={type:x.type,lv:x.lv+1};state.board[j]=null;state.selected=null;state.xp+=5*(x.lv+1);toast("Merge! "+itemName(state.board[i]));levelUp();render()}
+ else{state.board[j]=x;state.board[i]=y;state.selected=null;render()}
+}
+function levelUp(){let need=state.level*80;while(state.xp>=need){state.xp-=need;state.level++;state.coins+=100;toast("Level "+state.level+"! +100 Münzen");need=state.level*80}}
+function makeOrder(){let types=Object.keys(chains),type=types[Math.floor(Math.random()*types.length)],max=Math.min(4,1+Math.floor(state.level/2)),lv=Math.floor(Math.random()*max);return{type,lv,reward:25+(lv+1)*30}}
+function ensureOrders(){while(state.orders.length<3)state.orders.push(makeOrder())}
+function findOrderItem(o){return state.board.findIndex(x=>x&&!x.gen&&x.type===o.type&&x.lv===o.lv)}
+function claim(k){let o=state.orders[k],i=findOrderItem(o);if(i<0)return;state.board[i]=null;state.coins+=o.reward;state.xp+=20+o.lv*10;state.orders.splice(k,1);ensureOrders();levelUp();toast("Auftrag erledigt! +"+o.reward+" 🪙");render()}
+function addGenerator(){let e=firstEmpty();if(e<0)return toast("Brett ist voll");let g=gens[Math.floor(Math.random()*gens.length)];state.board[e]={icon:g[0],gen:g[1],name:g[2]};render()}
+function shuffle(){let filled=state.board.filter(Boolean);state.board=filled.concat(Array(36-filled.length).fill(null));state.selected=null;render()}
+function resetGame(){if(confirm("Spielstand wirklich löschen?")){localStorage.removeItem("harborStories");location.reload()}}
+function render(){ensureOrders();document.getElementById("coins").textContent=state.coins;document.getElementById("level").textContent=state.level;
+ let b=document.getElementById("board");b.innerHTML="";state.board.forEach((x,i)=>{let d=document.createElement("div");d.className="cell"+(state.selected===i?" sel":"")+(x&&x.gen?" generator":"");d.onclick=()=>tap(i);if(x){d.innerHTML=(x.gen?x.icon:icon(x))+(x.gen?"":`<span class="lv">L${x.lv+1}</span>`);d.title=x.gen?x.name:itemName(x)}else d.classList.add("empty");b.appendChild(d)});
+ let od=document.getElementById("orders");od.innerHTML="";state.orders.forEach((o,k)=>{let ready=findOrderItem(o)>=0,d=document.createElement("div");d.className="order";d.innerHTML=`<b>${chains[o.type][o.lv][0]} ${chains[o.type][o.lv][1]}</b><br><small>Belohnung: ${o.reward} 🪙</small><br><button ${ready?"":"disabled"} onclick="claim(${k})">${ready?"Abgeben":"Noch bauen"}</button>`;od.appendChild(d)});
+ let need=state.level*80;document.getElementById("xpbar").style.width=(state.xp/need*100)+"%";document.getElementById("xptext").textContent=`XP ${state.xp} / ${need} bis Level ${state.level+1}`;save()}
+render();
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script></body></html>
